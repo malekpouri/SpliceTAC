@@ -3,7 +3,7 @@
 Code, harmonised data pipeline, per-variant predictions and analysis outputs for
 
 > M. Malekpouri, S. Lotfi. *Transfer-aware calibration and selective prediction of splicing variant effects
-> across genes and assays.* (submitted to *Computers in Biology and Medicine*)
+> across genes and assays.* (submitted to *Artificial Intelligence in Medicine*)
 
 The study asks whether a splicing variant-effect predictor can tell when it is unreliable on genes and assays whose
 experimental effects were never used for training. It provides
