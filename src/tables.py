@@ -42,7 +42,7 @@ def table_data():
 
 def table_point():
     rows = []
-    names = {"SpliceNet ensemble": "SpliceNet (5-member ensemble)", "SpliceNet single": "SpliceNet (single)",
+    names = {"Two-branch ensemble": "Two-branch ensemble (5 members)", "Two-branch single": "Two-branch, single member",
              "baseline: lightgbm": "LightGBM (same features)", "baseline: pangolin_ridge": "Pangolin + ridge",
              "baseline: zero": "$\\Delta\\Psi=0$"}
     for prot, lab in (("random", "Random"), ("gene", "Unseen gene"), ("study", "Unseen study")):
@@ -122,7 +122,7 @@ def table_selective(prot="gene"):
 def table_bench():
     d = pd.read_csv(RESULTS / "bench_discrimination.csv")
     c = pd.read_csv(RESULTS / "bench_readout_corr.csv").set_index("gene")
-    lab = {"s_pSDV": "SpliceNet $p(\\mathrm{SDV})$ (primary)", "s_negmu": "SpliceNet $-\\hat{\\Delta\\Psi}$",
+    lab = {"s_pSDV": "Two-branch $p(\\mathrm{SDV})$ (primary)", "s_negmu": "Two-branch $-\\hat{\\Delta\\Psi}$",
            "tool_spliceai": "SpliceAI", "tool_pangolin": "Pangolin", "tool_mmsplice": "MMSplice",
            "tool_conspliceml": "ConSpliceML", "tool_hal": "HAL", "tool_scap": "S-CAP",
            "tool_squirls": "SQUIRLS", "tool_spanr": "SPANR"}
@@ -147,8 +147,8 @@ def table_bench():
         r = c.loc[g]
         rows.append([g, str(int(r.n)), F3(r.spearman_negmu), F3(r.spearman_pSDV), F3(r.spearman_spliceai),
                      F3(r.spearman_pangolin)])
-    body = ("\\begin{tabular}{lrrrrr}\n\\toprule\nGene & $n$ & SpliceNet $-\\hat{\\Delta\\Psi}$ & "
-            "SpliceNet $p(\\mathrm{SDV})$ & SpliceAI & Pangolin\\\\\n\\midrule\n")
+    body = ("\\begin{tabular}{lrrrrr}\n\\toprule\nGene & $n$ & Two-branch $-\\hat{\\Delta\\Psi}$ & "
+            "Two-branch $p(\\mathrm{SDV})$ & SpliceAI & Pangolin\\\\\n\\midrule\n")
     body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
     body += "\n\\bottomrule\n\\end{tabular}\n"
     write("table_bench_readout", body)
@@ -205,7 +205,8 @@ def table_bench_triage():
 
 def table_paired():
     d = pd.read_csv(RESULTS / "paired_bootstrap.csv")
-    plab = {"gene": "Unseen gene", "study": "Unseen study", "random": "Random"}
+    plab = {"gene": "Unseen gene", "study": "Unseen study (pooled)", "random": "Random",
+            "study:MFASS->VexSeq": "MFASS$\\rightarrow$Vex-seq", "study:VexSeq->MFASS": "Vex-seq$\\rightarrow$MFASS"}
     mlab = {"interval_score": "Interval score", "cov_large_effect": "Large-effect coverage",
             "frac_genes_undercovered": "Genes under-covered", "AURC": "AURC"}
     clab = {"split_conformal": "split conformal", "scaled_conformal_ens": "scaled conformal",
@@ -215,17 +216,20 @@ def table_paired():
     rows = []
     for _, r in d.iterrows():
         comp = clab[r.comparison.replace("TAC - ", "")]
-        rows.append([plab[r.protocol], mlab[r.metric], comp, f"{r['diff']:+.4f}", f"[{r.ci_lo:+.4f}, {r.ci_hi:+.4f}]"])
-    body = ("\\begin{tabular}{lllrl}\n\\toprule\nProtocol & Metric & TAC minus & Difference & 95\\% CI\\\\\n"
-            "\\midrule\n")
-    body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
-    body += "\n\\bottomrule\n\\end{tabular}\n"
-    write("tableS3_paired", body)
+        rows.append([plab[r.protocol], mlab[r.metric], comp, f"{r['diff']:+.4f}",
+                     f"[{r.ci_lo:+.4f}, {r.ci_hi:+.4f}]", f"[{r.bonf_lo:+.4f}, {r.bonf_hi:+.4f}]"])
+    head = ("\\begin{tabular}{lllrll}\n\\toprule\nProtocol & Metric & TAC minus & Difference & 95\\% CI & "
+            "Bonferroni CI\\\\\n\\midrule\n")
+    for name, keep in (("tableS3a_paired", ("Unseen gene", "Random")),
+                       ("tableS3b_paired", ("Unseen study (pooled)",)),
+                       ("tableS3c_paired", ("MFASS$\\rightarrow$Vex-seq", "Vex-seq$\\rightarrow$MFASS"))):
+        sub = [r for r in rows if r[0] in keep]
+        write(name, head + "\n".join(" & ".join(r) + " \\\\" for r in sub) + "\n\\bottomrule\n\\end{tabular}\n")
 
 
 def table_ablation():
     d = pd.read_csv(RESULTS / "point_ablation.csv")
-    names = {"SpliceNet ensemble": "Full model (5 members)", "SpliceNet single": "Full model, single member",
+    names = {"Two-branch ensemble": "Full model (5 members)", "Two-branch single": "Full model, single member",
              "ablation: no_local": "$-$ local sequence branch (3 members)",
              "ablation: no_ctx": "$-$ Pangolin context branch (3 members)",
              "ablation: no_assay": "$-$ assay embedding (3 members)",
@@ -245,9 +249,101 @@ def table_ablation():
     write("table_ablation", body)
 
 
+UQ_LAB = {"ensemble_gaussian": "Ensemble Gaussian (uncalibrated)", "split_conformal": "Split conformal",
+          "scaled_conformal_ens": "Scaled conformal", "weighted_scaled_conformal": "Weighted scaled conformal (cov.\\ shift)",
+          "mondrian_region": "Mondrian (region)", "mondrian_pred_effect": "Mondrian (predicted effect)",
+          "group_conformal": "Gene-weighted conformal", "CQR": "CQR", "CQR_gene_weighted": "CQR, gene-weighted",
+          "TAC_split": "TAC, variant quantile", "TAC": "TAC"}
+
+
+def table_uq_gene(alpha=0.1):
+    """Main comparison on unseen genes: original + revision baselines, incl. predicted-effect coverage."""
+    it = pd.read_csv(RESULTS / "intervals_gene.csv")
+    it = it[(it.alpha == alpha) & (it.study == "all")].set_index("method")
+    ex_ = pd.read_csv(RESULTS / "rev_extra_baselines_gene.csv")
+    ex_ = ex_[ex_.alpha == alpha].set_index("method")
+    pe = pd.read_csv(RESULTS / "rev_predicted_effect_coverage.csv")
+    pe = pe[(pe.alpha == alpha) & (pe.protocol == "gene") & (pe.study == "all")].set_index("method")
+    rows = []
+    for m, nm in UQ_LAB.items():
+        if m in ex_.index:
+            q = ex_.loc[m]; cpl = q.cov_pred_large
+        else:
+            q = it.loc[m]; cpl = pe.loc[m, "cov_pred_large"]
+        rows.append([nm, F3(q.coverage), F3(q.width_mean), F3(q.interval_score), F3(q.gene_cov_p10),
+                     F3(q.frac_genes_undercovered), F3(q.region_cov_min), F3(cpl), F3(q.cov_large_effect)])
+    body = ("\\begin{tabular}{lrrrrrrrr}\n\\toprule\n& & & & \\multicolumn{2}{c}{Genes} & Regions & \\multicolumn{2}{c}{Large effects}\\\\\n"
+            "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(lr){8-9}\n"
+            "Method & Coverage & Width & Int.\\ score & P10 cov. & Under-cov. & Worst cov. & Predicted & True\\\\\n\\midrule\n")
+    body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
+    body += "\n\\bottomrule\n\\end{tabular}\n"
+    write("table_uq_gene", body)
+
+
+def table_predictor_agnostic(alpha=0.1):
+    d = pd.read_csv(RESULTS / "rev_predictor_agnostic.csv")
+    d = d[d.alpha == alpha]
+    mlab = {"split_conformal": "Split conformal", "group_conformal": "Gene-weighted conformal",
+            "mondrian_pred_effect": "Mondrian (predicted effect)", "TAC": "TAC (out-of-gene scale)"}
+    plab = {"pangolin_ridge": "Pangolin + ridge", "lightgbm": "LightGBM"}
+    rows = []
+    for pk, pn in plab.items():
+        for m, nm in mlab.items():
+            q = d[(d.predictor == pk) & (d.method == m)].iloc[0]
+            rows.append([pn if m == "split_conformal" else "", nm, F3(q.coverage), F3(q.interval_score),
+                         F3(q.frac_genes_undercovered), F3(q.region_cov_min), F3(q.cov_pred_large), F3(q.cov_large_effect)])
+    body = ("\\begin{tabular}{llrrrrrr}\n\\toprule\nPredictor & Method & Coverage & Int.\\ score & Genes under-cov. & "
+            "Worst region & Pred.\\ large & True large\\\\\n\\midrule\n")
+    body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
+    body += "\n\\bottomrule\n\\end{tabular}\n"
+    write("table_predictor_agnostic", body)
+
+
+def table_fewshot():
+    d = pd.read_csv(RESULTS / "rev_fewshot_study.csv")
+    mlab = {"split_conformal": "Split conformal", "scaled_conformal_ens": "Scaled conformal",
+            "group_conformal": "Gene-weighted conformal", "TAC": "TAC"}
+    rows = []
+    for dirn in ("MFASS->VexSeq", "VexSeq->MFASS"):
+        for m, nm in mlab.items():
+            q = d[(d.direction == dirn) & (d.method == m)].iloc[0]
+            rows.append([dirn.replace("->", "$\\rightarrow$").replace("VexSeq", "Vex-seq") if m == "split_conformal" else "",
+                         nm, f"{q.coverage_mean:.3f} $\\pm$ {q.coverage_std:.3f}", F3(q.width_mean_mean),
+                         F3(q.frac_genes_undercovered_mean), F3(q.region_cov_min_mean), F3(q.cov_large_effect_mean)])
+    body = ("\\begin{tabular}{llrrrrr}\n\\toprule\nDirection & Method & Coverage (mean $\\pm$ SD) & Width & "
+            "Genes under-cov. & Worst region & True large\\\\\n\\midrule\n")
+    body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
+    body += "\n\\bottomrule\n\\end{tabular}\n"
+    write("tableS_fewshot", body)
+
+
+def table_robustness():
+    d = pd.read_csv(RESULTS / "rev_robustness.csv")
+    mlab = {"split_conformal": "Split conformal", "scaled_conformal_ens": "Scaled conformal",
+            "group_conformal": "Gene-weighted conformal", "TAC": "TAC"}
+    rows = []
+    for run, g in d.groupby("run", sort=False):
+        first = True
+        for _, q in g.iterrows():
+            if q.method in mlab:
+                rows.append([run if first else "", mlab[q.method], F3(q.MAE), F3(q.coverage),
+                             F3(q.frac_genes_undercovered), F3(q.region_cov_min), F3(q.cov_pred_large),
+                             F3(q.cov_large_effect), ""])
+            else:
+                rows.append([run if first else "", "Class-conditional triage", F3(q.MAE), "", "", "", "", "",
+                             F3(q.frac_large_called_small)])
+            first = False
+    body = ("\\begin{tabular}{llrrrrrrr}\n\\toprule\nRun & Method & MAE & Coverage & Genes under-cov. & Worst region & "
+            "Pred.\\ large & True large & Large called small\\\\\n\\midrule\n")
+    body += "\n".join(" & ".join(r) + " \\\\" for r in rows)
+    body += "\n\\bottomrule\n\\end{tabular}\n"
+    write("tableS_robustness", body)
+
+
 if __name__ == "__main__":
     table_data()
-    for fn in (table_point, table_intervals, table_selective, table_bench, table_triage, table_bench_triage, table_paired, table_ablation):
+    for fn in (table_point, table_intervals, table_selective, table_bench, table_triage, table_bench_triage, table_paired, table_ablation,
+               table_uq_gene, table_predictor_agnostic, table_fewshot, table_robustness):
         try:
             fn()
         except FileNotFoundError as e:

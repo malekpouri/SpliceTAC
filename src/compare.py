@@ -34,14 +34,22 @@ def gene_stats(t):
     return g.join(big).fillna(0)
 
 
+N_COMPARISONS = 18   # comparisons per protocol (5 baselines x 3 interval metrics + 3 AURC)
+
+
 def boot(stat, genes, B=2000, seed=0):
+    """Percentile CIs: unadjusted 95% and Bonferroni-adjusted over N_COMPARISONS."""
     rng = np.random.default_rng(seed)
     vals = [stat(rng.choice(genes, len(genes), replace=True)) for _ in range(B)]
-    return np.percentile(vals, [2.5, 97.5])
+    a = 0.05 / N_COMPARISONS
+    return np.percentile(vals, [2.5, 97.5, 100 * a / 2, 100 * (1 - a / 2)])
 
 
-def compare_protocol(prot):
+def compare_protocol(prot, fold=None):
     p = A.load(prot)
+    if fold is not None:
+        p = p[p.fold == fold]
+        prot = f"{prot}:{fold}"
     rows = []
     T = {m: gene_stats(pooled_intervals(p, m)) for m in ["TAC"] + BASELINES}
     genes = T["TAC"].index.to_numpy()
@@ -56,9 +64,9 @@ def compare_protocol(prot):
     for m in BASELINES:
         for k in ("interval_score", "cov_large_effect", "frac_genes_undercovered"):
             f = lambda gs: metrics(T["TAC"], gs)[k] - metrics(T[m], gs)[k]
-            lo, hi = boot(f, genes)
+            lo, hi, blo, bhi = boot(f, genes)
             rows.append({"protocol": prot, "comparison": f"TAC - {m}", "metric": k, "diff": f(genes),
-                         "ci_lo": lo, "ci_hi": hi})
+                         "ci_lo": lo, "ci_hi": hi, "bonf_lo": blo, "bonf_hi": bhi})
     # selective prediction: AURC differences (pooled test, genes resampled)
     t = p[p.split == "test"].reset_index(drop=True)
     idx = {g: np.where(t.gene_name.to_numpy() == g)[0] for g in t.gene_name.unique()}
@@ -72,9 +80,9 @@ def compare_protocol(prot):
     for name, fn in CONF_BASE.items():
         cb = fn(t).to_numpy()
         f = lambda gs: aurc(c_tac, gs) - aurc(cb, gs)
-        lo, hi = boot(f, genes_t, B=500)
+        lo, hi, blo, bhi = boot(f, genes_t, B=500)
         rows.append({"protocol": prot, "comparison": f"TAC - {name}", "metric": "AURC", "diff": f(genes_t),
-                     "ci_lo": lo, "ci_hi": hi})
+                     "ci_lo": lo, "ci_hi": hi, "bonf_lo": blo, "bonf_hi": bhi})
     return pd.DataFrame(rows)
 
 
@@ -83,6 +91,8 @@ if __name__ == "__main__":
     for prot in ("gene", "study", "random"):
         if (RESULTS / f"pred_{prot}.parquet").exists():
             res.append(compare_protocol(prot))
+    for fold in ("MFASS->VexSeq", "VexSeq->MFASS"):     # per-direction (small calibration sets)
+        res.append(compare_protocol("study", fold))
     d = pd.concat(res)
     d.to_csv(RESULTS / "paired_bootstrap.csv", index=False)
     pd.set_option("display.width", 200)

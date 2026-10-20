@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 DEV = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+LOSS = "huber"   # point loss for the mean head: "huber" (main analysis) or "mse" (sensitivity analysis)
 
 
 class ResConv(nn.Module):
@@ -36,7 +37,7 @@ class LocalEncoder(nn.Module):
         return torch.cat([h.mean(-1), h.amax(-1)], 1)
 
 
-class SpliceNet(nn.Module):
+class TwoBranchNet(nn.Module):
     def __init__(self, n_ctx, n_tab, use_local=True, use_ctx=True, use_assay=True, n_assay=3, hid=256,
                  drop=0.2):
         super().__init__()
@@ -85,7 +86,8 @@ def batches(T, idx, bs, shuffle, rng=None):
 
 def loss_fn(mu, sig, logit, b, lam_nll=0.5, lam_cls=0.5):
     y, w = b["y"], b["w"]
-    hub = F.huber_loss(mu, y, delta=0.1, reduction="none")
+    hub = (F.huber_loss(mu, y, delta=0.1, reduction="none") if LOSS == "huber"
+           else F.mse_loss(mu, y, reduction="none"))
     nll = 0.5 * ((y - mu.detach()) / sig) ** 2 + torch.log(sig)
     m = torch.isfinite(b["sdv"])
     cls = (F.binary_cross_entropy_with_logits(logit[m], b["sdv"][m], reduction="sum") / max(1, m.sum())
@@ -109,7 +111,7 @@ def train(T, tr_idx, va_idx, n_ctx, n_tab, seed, max_epochs=40, patience=6, lr=1
           unknown_assay_p=0.2, **arch):
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
-    model = SpliceNet(n_ctx, n_tab, **arch).to(DEV)
+    model = TwoBranchNet(n_ctx, n_tab, **arch).to(DEV)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs)
     best, best_state, bad = np.inf, None, 0

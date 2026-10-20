@@ -53,7 +53,7 @@ def fig_shift_penalty():
             d = pd.read_csv(f)
             rows.append(d[d.study != "all"].assign(protocol=lab))
     d = pd.concat(rows)
-    models = {"SpliceNet ensemble": ("SpliceNet ensemble", PAL[0]), "baseline: lightgbm": ("LightGBM", PAL[1]),
+    models = {"Two-branch ensemble": ("Two-branch ensemble", PAL[0]), "baseline: lightgbm": ("LightGBM", PAL[1]),
               "baseline: pangolin_ridge": ("Pangolin ridge", PAL[2]), "baseline: zero": ("ΔΨ = 0", GRAY)}
     fig, axes = plt.subplots(1, 4, figsize=(7.2, 2.4))
     for j, (study, metric) in enumerate([("MFASS", "MAE"), ("VexSeq", "MAE"), ("MFASS", "Pearson"),
@@ -151,7 +151,7 @@ def fig_risk_coverage():
 def fig_benchmark():
     disc = pd.read_csv(RESULTS / "bench_discrimination.csv")
     sel = pd.read_csv(RESULTS / "bench_selective.csv")
-    lab = {"s_pSDV": "SpliceNet p(SDV)", "s_negmu": "SpliceNet −ΔΨ̂", "tool_spliceai": "SpliceAI",
+    lab = {"s_pSDV": "Two-branch p(SDV)", "s_negmu": "Two-branch −ΔΨ̂", "tool_spliceai": "SpliceAI",
            "tool_pangolin": "Pangolin", "tool_mmsplice": "MMSplice", "tool_hal": "HAL", "tool_scap": "S-CAP",
            "tool_squirls": "SQUIRLS", "tool_spanr": "SPANR", "tool_conspliceml": "ConSpliceML"}
     genes = ["FAS", "MST1R", "POU1F1", "WT1", "BRCA1", "MLH1"]

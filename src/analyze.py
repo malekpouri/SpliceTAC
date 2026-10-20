@@ -29,7 +29,7 @@ def load(protocol):
 def point_table(p):
     rows = []
     t = p[p.split == "test"]
-    preds = {"SpliceNet ensemble": "mu", "SpliceNet single": "mu_single"}
+    preds = {"Two-branch ensemble": "mu", "Two-branch single": "mu_single"}
     preds.update({f"baseline: {c[5:]}": c for c in p.columns if c.startswith("base_")})
     preds.update({f"ablation: {c[4:-3]}": c for c in p.columns if c.startswith("abl_") and c.endswith("_mu")})
     for study, g in [("all", t)] + list(t.groupby("study_id")):
@@ -99,7 +99,7 @@ def classification_table(p):
         t = f[(f.split == "test") & f.disruption_label.notna()]
         if len(t) == 0 or t.disruption_label.nunique() < 2:
             continue
-        for name, col, sgn in (("SpliceNet p(SDV)", "p", 1), ("SpliceNet -muPSI", "mu", -1),
+        for name, col, sgn in (("Two-branch p(SDV)", "p", 1), ("Two-branch -muPSI", "mu", -1),
                                ("LightGBM -muPSI", "base_lightgbm", -1),
                                ("Pangolin-ridge -muPSI", "base_pangolin_ridge", -1)):
             thr = (uq.best_mcc_threshold(c.disruption_label.to_numpy().astype(int), sgn * c[col].to_numpy())

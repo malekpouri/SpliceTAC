@@ -16,6 +16,7 @@ import pandas as pd
 import torch
 
 import experiment as ex
+import nn_model as nm
 import uq
 from config import RESULTS, SEED
 
@@ -88,7 +89,12 @@ def main():
     ap.add_argument("protocol")
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--only_fold", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=SEED, help="outer split / training seed")
+    ap.add_argument("--loss", choices=["huber", "mse"], default="huber")
+    ap.add_argument("--tag", default="", help="suffix for output files and fold names")
+    ap.add_argument("--no_inner", action="store_true", help="skip out-of-gene residual loop (no TAC)")
     a = ap.parse_args()
+    nm.LOSS = a.loss
     df, T, ctx_cols, pgsum, ctxemb = ex.load_all()
     X = ex.tabular_matrix(df, pgsum)
     train_pool = np.where(df.study_id.isin(["MFASS", "VexSeq"]) & df.delta_psi.notna())[0]
@@ -98,7 +104,7 @@ def main():
 
     if a.protocol in ("gene", "random", "ablation"):
         split_fn = rsplit if a.protocol == "random" else gsplit
-        folds = split_fn(train_pool, [1 / a.folds] * a.folds, SEED)
+        folds = split_fn(train_pool, [1 / a.folds] * a.folds, a.seed)
         archs = None
         if a.protocol == "ablation":
             archs = {"no_local": {"use_local": False}, "no_ctx": {"use_ctx": False},
@@ -108,8 +114,9 @@ def main():
                 continue
             te = folds[k]
             dev = np.concatenate([folds[j] for j in range(a.folds) if j != k])
-            o, info = run_fold(df, T, ctxemb, pgsum, X, dev, te, split_fn, SEED + k, False,
-                               f"{a.protocol}{k}", inner=(a.protocol != "ablation"), archs=archs)
+            o, info = run_fold(df, T, ctxemb, pgsum, X, dev, te, split_fn, a.seed + k, False,
+                               f"{a.protocol}{a.tag}{k}",
+                               inner=(a.protocol != "ablation" and not a.no_inner), archs=archs)
             results.append(o); infos[k] = info
     elif a.protocol == "study":
         for src, tgt in (("MFASS", "VexSeq"), ("VexSeq", "MFASS")):
@@ -124,7 +131,7 @@ def main():
         te = np.where(df.study_id.str.startswith("Bench_"))[0]
         o, info = run_fold(df, T, ctxemb, pgsum, X, train_pool, te, gsplit, SEED, True, "bench")
         results.append(o); infos["bench"] = info
-    suffix = "" if a.only_fold is None else f"_f{a.only_fold}"
+    suffix = a.tag + ("" if a.only_fold is None else f"_f{a.only_fold}")
     pd.concat(results, ignore_index=True).to_parquet(RESULTS / f"pred_{a.protocol}{suffix}.parquet")
     (RESULTS / f"info_{a.protocol}{suffix}.json").write_text(json.dumps(infos, indent=1))
 

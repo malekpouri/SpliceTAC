@@ -61,3 +61,17 @@ computed (i) with the ordinary and (ii) with the gene-weighted quantile. Predict
 or abstain (both / empty). Target: <= alpha of true large effects confidently called small.
 Same metrics as Amendment 2; benchmark: calibrate on MFASS+Vex-seq, evaluate vs. SDV labels.
 `gene` = exploratory; `study`, `random`, `bench` = confirmatory.
+
+## Amendment 4 (2026-10-20, pre-submission revision after internal review; written BEFORE any of these analyses were run)
+Added in response to an internal reviewer-style assessment (paper_aiim/REVIEWER_ASSESSMENT.md). All are
+post hoc with respect to the original plan and will be labelled as revision analyses:
+1. Baselines: conformalised quantile regression (CQR; LightGBM quantile models on the same inputs),
+   weighted split conformal under covariate shift (Tibshirani et al. 2019; classifier-based density ratio between
+   calibration and test transfer features), Mondrian conformal by predicted-effect bins (|mu| tertiles on calibration).
+2. Coverage conditional on predicted effect (|mu| > 0.2 vs <= 0.2), reported next to outcome-conditional coverage.
+3. Predictor-agnosticism: the UQ comparison repeated with the Pangolin-ridge and LightGBM predictors.
+4. Few-shot target calibration for unseen studies: 20% of target-study genes used as calibration, rest as test.
+5. Robustness: second outer split seed (20261020) for the full gene protocol; MSE instead of Huber loss
+   (gene protocol, no inner loop) to test whether loss-induced shrinkage drives large-effect under-coverage.
+6. Multiplicity: Bonferroni-adjusted paired bootstrap intervals; per-direction intervals for the study protocol.
+Interpretation rule: conclusions in the paper are revised if they do not hold under these analyses.

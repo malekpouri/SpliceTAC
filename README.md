@@ -2,19 +2,21 @@
 
 Code, harmonised data pipeline, per-variant predictions and analysis outputs for
 
-> M. Malekpouri, S. Lotfi. *Transfer-aware calibration and selective prediction of splicing variant effects
-> across genes and assays.* (submitted to *Artificial Intelligence in Medicine*)
+> M. Malekpouri, S. Lotfi. *Calibrating splicing variant-effect predictors for unseen genes and assays: conformal
+> uncertainty, abstention and decision-aware triage.* (submitted to *Artificial Intelligence in Medicine*)
 
 The study asks whether a splicing variant-effect predictor can tell when it is unreliable on genes and assays whose
 experimental effects were never used for training. It provides
 
 * a harmonised variant–exon–assay table built from two massively parallel splicing assays (MFASS, Vex-seq;
   29,669 SNVs, 1,677 genes) and a locked six-gene saturation benchmark (Smith & Kitzman 2023; 3,912 variants);
-* **SpliceNet**, a two-branch predictor (local CNN + frozen Pangolin features) trained as a 5-member deep ensemble;
-* **TAC** (transfer-aware conformal prediction): a difficulty model learned from *out-of-gene* residuals,
-  calibrated with a gene-weighted conformal quantile;
-* baseline UQ methods (split, scaled, Mondrian, gene-weighted conformal; ensemble-Gaussian), selective-prediction
-  analyses and **class-conditional conformal triage** for the decision |ΔΨ| > 0.2;
+* a **two-branch predictor** (local CNN + frozen Pangolin features) trained as a 5-member deep ensemble, plus
+  Pangolin-ridge and LightGBM predictors for predictor-agnostic comparisons;
+* eleven UQ methods: split, scaled, shift-weighted (Tibshirani et al. 2019), Mondrian (region / predicted effect),
+  gene-weighted (Dunn et al. 2023) and quantile-regression (CQR) conformal prediction, ensemble-Gaussian intervals,
+  and **TAC**, a transfer-aware baseline whose scale is learned from *out-of-gene* residuals;
+* selective-prediction analyses and **class-conditional conformal triage** for the decision |ΔΨ| > 0.2;
+* robustness analyses (second gene partition, squared-error loss, few-shot target calibration);
 * gene-held-out, random, unseen-study and external-benchmark evaluation protocols.
 
 ## Repository layout
@@ -29,7 +31,9 @@ experimental effects were never used for training. It provides
 | `src/experiment.py` | gene-disjoint splits, ensembles, out-of-gene residuals, interval methods |
 | `src/uq.py` | split and gene-weighted conformal quantiles, difficulty model, metrics |
 | `src/run.py` | runs one protocol: `gene`, `random`, `study`, `bench`, `ablation` |
-| `src/analyze.py`, `compare.py`, `tables.py`, `figures.py` | metrics, paired gene bootstrap, LaTeX tables, figures |
+| `src/analyze.py`, `compare.py`, `tables.py`, `figures.py` | metrics, paired gene bootstrap (95% and Bonferroni), LaTeX tables, figures |
+| `src/revision.py` | CQR, shift-weighted and predicted-effect Mondrian baselines; predictor-agnostic comparison; few-shot target calibration; robustness summary |
+| `src/graphical_abstract.py` | graphical abstract |
 | `scripts/download_data.sh` | downloads all public inputs into `data/` |
 | `results/` | per-variant predictions (`pred_*.parquet`), out-of-gene residuals (`oog_*.parquet`), all metric CSVs, `ANALYSIS_PLAN.md` (pre-specified plan with time-stamped amendments), data provenance |
 | `figures/` | all manuscript figures (PDF + PNG) |
@@ -48,8 +52,14 @@ bash scripts/download_data.sh            # writes ./data (or set SPLICETAC_DATA=
 # 3. full pipeline (~5 h on an 8 GB GPU); protocols with existing results/pred_*.parquet are skipped
 bash run_all.sh
 
-# 4. statistics, tables, figures
-cd src && python compare.py && python tables.py && python figures.py
+# 4. revision analyses (CPU; extra baselines, predictor-agnostic, few-shot, predicted-effect coverage)
+cd src && python revision.py
+python run.py gene --seed 20261020 --tag _seed2          # second gene partition (GPU)
+python run.py gene --loss mse --no_inner --tag _mse      # loss sensitivity (GPU)
+python revision.py --robustness
+
+# 5. statistics, tables, figures, graphical abstract
+python compare.py && python tables.py && python figures.py && python graphical_abstract.py
 ```
 
 All metrics can be recomputed from the shipped predictions without retraining:
