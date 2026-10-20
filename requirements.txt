@@ -1,0 +1,11 @@
+# Python 3.12. Install torch separately for your CUDA version (tested: torch 2.14.1, CUDA 12.8/13.0).
+numpy==2.5.4
+pandas==3.0.6
+scipy==1.18.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+matplotlib==3.11.2
+pyfaidx==0.9.0.4
+pyarrow==26.0.0
+openpyxl==3.1.5
+tqdm==4.70.1

@@ -1,0 +1,6 @@
+data/
+logs/
+.venv/
+__pycache__/
+*.pyc
+results/latex_tables/

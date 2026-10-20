@@ -1,0 +1,16 @@
+{
+ "MFASS->VexSeq": {
+  "n_train": 19768,
+  "n_val": 2516,
+  "n_cal": 5123,
+  "n_test": 1949,
+  "minutes": 12.932941194375356
+ },
+ "VexSeq->MFASS": {
+  "n_train": 1180,
+  "n_val": 148,
+  "n_cal": 274,
+  "n_test": 27720,
+  "minutes": 1.2634543697039287
+ }
+}

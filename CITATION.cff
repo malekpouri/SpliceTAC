@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite the accompanying article."
+title: "SpliceTAC: transfer-aware calibration and selective prediction of splicing variant effects"
+authors:
+  - family-names: Malekpouri
+    given-names: Mohammad
+    orcid: "https://orcid.org/0009-0001-6278-6163"
+    affiliation: "Department of Computer Engineering, BA.C., Islamic Azad University, Bandar Abbas, Iran"
+  - family-names: Lotfi
+    given-names: Somayeh
+    orcid: "https://orcid.org/0000-0002-7218-5388"
+    affiliation: "Department of Computer Engineering, BA.C., Islamic Azad University, Bandar Abbas, Iran"
+repository-code: "https://github.com/malekpouri/SpliceTAC"
+license: MIT
+version: "1.0.0"
+date-released: "2026-10-20"
